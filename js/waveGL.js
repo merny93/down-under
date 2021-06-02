@@ -1,6 +1,9 @@
 const twgl = require("twgl.js");
 const html2canvas = require("html2canvas");
 
+
+// the slow part is getting the canvas...
+// will upgrade later to default to a map of 1s and then update to the actual vals when we have them
 function getCanvas() {
   html2canvas(document.getElementById("web-template")).then(function (canvas) {
     let ctx = canvas.getContext("2d");
@@ -11,11 +14,15 @@ function getCanvas() {
   });
 }
 
+// generate the webGL environment
 var canvas = document.getElementById("glCanvas");
 var gl = canvas.getContext("webgl");
 if (!gl) {
     alert("no web gl for me");
 }
+
+//create the render 
+// called when the canvas image is ready!
 function make_render(canvas){
   const programInfo = twgl.createProgramInfo(gl, [vertexShader, fragSahder]);
 
