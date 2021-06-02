@@ -21,8 +21,82 @@ if (!gl) {
     alert("no web gl for me");
 }
 
+//Creat the program object 
+const programInit = twgl.createProgramInfo(gl, [waveVert, initFrag]);
+const programCompute = twgl.createProgramInfo(gl, [waveVert, computeFrag]);
+const programVisualize = twgl.createProgramInfo(gl, [waveVert, visualizeFrag]);
+
+//get the frame buffer so we can compute without drawing
+let fb1 = twgl.createFrameBufferInfo(gl);
+let fb2 = twgl.createFrameBufferInfo(gl);
+
+const positionObject = { position: { data: [1, 1, 1, -1, -1, -1, -1, 1], numComponents: 2 } };
+const positionBuffer = twgl.createBufferInfoFromArrays(gl, positionObject);
+
+
+//do the initilization
+gl.useProgram(programInit.program);
+twgl.setBuffersAndAttributes(gl, programInit, positionBuffer);
+//bind a frame buffer to prevent the render
+twgl.bindFrameBufferInfo(gl, fb1);
+twgl.drawBufferInfo(gl, positionBuffer, gl.TRIANGLE_FAN);
+
+let dt;
+let prevTime;
+let pingpong = 2;
+let b = 0.05
+let diff =[1/gl.canvas.width, 1/gl.canvas.height];
+let tempFrameBuffer;
+
+
+function draw(time){
+  dt = (prevTime) ? time - prevTime : 0;
+  prevTime = time;
+
+  function coeff(val){
+    return (1/pow(dt,2)) +(b/dt)
+  }
+  //do the physics
+  gl.useProgram(programCompute.program);
+  twgl.setBuffersAndAttributes(gl, programCompute, positionBuffer);
+  //now the million uniforms
+  twgl.setUniforms(programCompute,{
+    waveTexture: fb1.attachments[0],
+    speedTexture: TODO,
+    pingpong: pingpong,
+    diff: diff,
+    dt: dt,
+    b: 0.05,
+    coeff1: coeff(1),
+    coeff2: coeff(2),
+    resolution: [gl.canvas.width, gl.canvas.height],
+  });
+  twgl.bindFrameBufferInfo(gl, fb2);
+  twgl.drawBufferInfo(gl, positionBuffer, gl.TRIANGLE_FAN);
+
+  //now onto the render
+  gl.useProgram(programVisualize);
+  twgl.setBuffersAndAttributes(gl, programVisualize, positionBuffer);
+  //pass the framebuffer uniform
+  twgl.setUniforms(programVisualize,{
+    resolution: [gl.canvas.width, gl.canvas.height],
+    pingpong: pingpong,
+    waveTexture: fb2.attachments[0],
+  });
+}
+
+
+
+
+
+
+
+
+
+
 //create the render 
 // called when the canvas image is ready!
+//test code from earlier
 function make_render(canvas){
   const programInfo = twgl.createProgramInfo(gl, [vertexShader, fragSahder]);
 

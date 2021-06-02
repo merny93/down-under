@@ -109,3 +109,11 @@ void main(){
   gl_FragColor = vec4(texture2D(waveTexture, uv)[pingpong], 0.0,0.0,1.0);
 }
 `;
+
+
+const initFrag = `
+precision mediump float;
+void main(){
+  gl_FragColor = vec4(0.0,0.0,0.0,1.0);
+}
+`;
