@@ -18,16 +18,17 @@
 </head>
 
 <body>
+	
 	<script src="bundle.js"></script>
-	<div id="web-template">
-		<div style="text-align: center; padding: 100px; font-size: 24pt;">
+	<div id="web-template" style="width: 640px !important; height: 480px !important;">
+		<div style="font-size: large;">
 			BONJOUR I am simon <br>
 			This is my swamp
 		</div>
 	</div>
-	<button style="margin-top: 100px;" onclick="doMagic();">press me</button>
+	<button style="margin-top: 100px;" onclick="getCanvas();">press me</button>
 	<canvas id="glCanvas" width="640" height="480"></canvas>
-	<script src="js/image.js"></script>
+	<!-- <script src="js/image.js"></script> -->
 	
 	<script src="js/shaders.js"></script>
 	<script src="js/waveGL.js"></script>

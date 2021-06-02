@@ -2,11 +2,9 @@ const vertexShader = `
 // an attribute will receive data from a buffer
 attribute vec4 position;
 
+
 // all shaders have a main function
 void main() {
-
-  // gl_Position is a special variable a vertex shader
-  // is responsible for setting
   gl_Position = position;
 }
 `;
@@ -16,9 +14,14 @@ const fragSahder = `
 // to pick one. mediump is a good default
 precision mediump float;
 
+// uniform float time;
+uniform sampler2D u_texture;
+uniform vec2 resolution;
+
+
 void main() {
-  // gl_FragColor is a special variable a fragment shader
-  // is responsible for setting
-  gl_FragColor = vec4(1, 1, 0.5, 1); // return reddish-purple
+  vec2 uv = gl_FragCoord.xy / resolution;
+  gl_FragColor = vec4(texture2D(u_texture, vec2(uv.x, 1.0 -uv.y)).rgb,1.0);
+  // gl_FragColor = vec4(uv.y,0.0,0.0,1.0);
 }
 `;
