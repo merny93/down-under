@@ -16,7 +16,7 @@ function getCanvas() {
 
 // generate the webGL environment
 var canvas = document.getElementById("glCanvas");
-var gl = canvas.getContext("webgl");
+var gl = twgl.getContext(canvas, { depth: false, antialiasing: false });
 if (!gl) {
     alert("no web gl for me");
 }
@@ -25,36 +25,67 @@ if (!gl) {
 const programInit = twgl.createProgramInfo(gl, [waveVert, initFrag]);
 const programCompute = twgl.createProgramInfo(gl, [waveVert, computeFrag]);
 const programVisualize = twgl.createProgramInfo(gl, [waveVert, visualizeFrag]);
+const programCopy = twgl.createProgramInfo(gl, [waveVert, copyFrag]);
 
 //get the frame buffer so we can compute without drawing
-let fb1 = twgl.createFrameBufferInfo(gl);
-let fb2 = twgl.createFrameBufferInfo(gl);
+//magic line to get it to work
+const attachments = [{ internalFormat:gl.RGBA32F, minMag: gl.NEAREST, wrap: gl.CLAMP_TO_EDGE }];
+let fb1 = twgl.createFramebufferInfo(gl,attachments);
+let fb2 = twgl.createFramebufferInfo(gl,attachments);
 
 const positionObject = { position: { data: [1, 1, 1, -1, -1, -1, -1, 1], numComponents: 2 } };
 const positionBuffer = twgl.createBufferInfoFromArrays(gl, positionObject);
 
+/// make the initial texture
+const c = document.createElement("canvas")
+var ctx = c.getContext("2d");
+ctx.canvas.width = gl.canvas.width;
+ctx.canvas.height = gl.canvas.height;
+ctx.fillStyle = "#FF0000";
+ctx.fillRect(200, 200, 250, 250);
+
+const initTexture =  twgl.createTexture(gl, {src: ctx.canvas});
 
 //do the initilization
 gl.useProgram(programInit.program);
 twgl.setBuffersAndAttributes(gl, programInit, positionBuffer);
+twgl.setUniforms(programInit, {
+  resolution: [gl.canvas.width, gl.canvas.height],
+  waveStart: initTexture,
+})
 //bind a frame buffer to prevent the render
-twgl.bindFrameBufferInfo(gl, fb1);
+twgl.bindFramebufferInfo(gl, fb1);
 twgl.drawBufferInfo(gl, positionBuffer, gl.TRIANGLE_FAN);
+
+/// make the speed map with just 1s
+const d = document.createElement("canvas")
+var ctx = d.getContext("2d");
+ctx.canvas.width = gl.canvas.width;
+ctx.canvas.height = gl.canvas.height;
+ctx.fillStyle = "#FF0000";
+ctx.fillRect(0, 0, gl.canvas.width, gl.canvas.height);
+
+const speedTexture =  twgl.createTexture(gl, {src: ctx.canvas});
+
+
 
 let dt;
 let prevTime;
 let pingpong = 2;
 let b = 0.05
 let diff =[1/gl.canvas.width, 1/gl.canvas.height];
-let tempFrameBuffer;
+
 
 
 function draw(time){
+  twgl.resizeCanvasToDisplaySize(gl.canvas);
+  gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+
   dt = (prevTime) ? time - prevTime : 0;
   prevTime = time;
 
   function coeff(val){
-    return (1/pow(dt,2)) +(b/dt)
+    return (val/Math.pow(dt,2)) +(b/dt)
   }
   //do the physics
   gl.useProgram(programCompute.program);
@@ -62,8 +93,7 @@ function draw(time){
   //now the million uniforms
   twgl.setUniforms(programCompute,{
     waveTexture: fb1.attachments[0],
-    speedTexture: TODO,
-    pingpong: pingpong,
+    speedTexture: speedTexture,
     diff: diff,
     dt: dt,
     b: 0.05,
@@ -71,11 +101,11 @@ function draw(time){
     coeff2: coeff(2),
     resolution: [gl.canvas.width, gl.canvas.height],
   });
-  twgl.bindFrameBufferInfo(gl, fb2);
+  twgl.bindFramebufferInfo(gl, fb2);
   twgl.drawBufferInfo(gl, positionBuffer, gl.TRIANGLE_FAN);
 
   //now onto the render
-  gl.useProgram(programVisualize);
+  gl.useProgram(programVisualize.program);
   twgl.setBuffersAndAttributes(gl, programVisualize, positionBuffer);
   //pass the framebuffer uniform
   twgl.setUniforms(programVisualize,{
@@ -83,11 +113,32 @@ function draw(time){
     pingpong: pingpong,
     waveTexture: fb2.attachments[0],
   });
+  //let it draw to the screen
+  twgl.bindFramebufferInfo(gl,null);
+  twgl.drawBufferInfo(gl, positionBuffer, gl.TRIANGLE_FAN);
+
+  gl.useProgram(programCopy.program);
+  twgl.setBuffersAndAttributes(gl, programCopy, positionBuffer);
+  twgl.setUniforms(programCopy,{
+    waveTexture: fb2.attachments[0],
+    resolution: [gl.canvas.width, gl.canvas.height],
+  });
+  twgl.bindFramebufferInfo(gl,fb1);
+  twgl.drawBufferInfo(gl, positionBuffer, gl.TRIANGLE_FAN);
+
+  // //do da pingpong
+  // tempFrameBuffer = fb1;
+  // fb1 = fb2;
+  // fb2 = tempFrameBuffer;
+  // pingpong = (pingpong +1)%3;
 }
 
 
 
-
+(function animate(now){
+  draw(now/1000);
+  requestAnimationFrame(animate);
+})(0);
 
 
 
