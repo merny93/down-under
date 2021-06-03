@@ -56,10 +56,12 @@ float dx = diff.x;
 vec2 dxV = vec2(dx,0);
 float dy = diff.y;
 vec2 dyV = vec2(0,dy);
+float del = (1.0/pow(dx,2.0)) + (1.0/pow(dy,2.0));
 //dunno but we probs want dx to be give or take less than 1/numPixels
 
 //this is dt
 uniform float dt;
+float dtSqared = pow(dt, 2.0);
 
 //this is the damping coeff
 uniform float b;
@@ -72,10 +74,10 @@ uniform float coeff2;
 //to get the uv coords
 uniform vec2 resolution;
 
-vec4 laplace(vec2 pos, sampler2D wave){
+vec4 partial(vec2 pos, sampler2D wave){
   vec4 res;
-  res = (texture2D(wave, pos+dxV) - 2.0*texture2D(wave, pos) + texture2D(wave, pos -dxV))/pow(dx, 2.0) + 
-        (texture2D(wave, pos+dyV) - 2.0*texture2D(wave, pos) + texture2D(wave, pos -dyV))/pow(dy, 2.0);
+  res = (texture2D(wave, pos+dxV) + texture2D(wave, pos -dxV))/pow(dx, 2.0) + 
+        (texture2D(wave, pos+dyV) + texture2D(wave, pos -dyV))/pow(dy, 2.0);
   return res;
 }
 
@@ -84,15 +86,13 @@ void main(){
   vec2 uv = gl_FragCoord.xy / resolution;
   gl_FragColor = vec4(texture2D(waveTexture,uv).rgb,1.0);
 
-  float term1 = pow(texture2D(speedTexture, uv).r,2.0)*laplace(uv, waveTexture)[tNow];
-  float term2 = coeff2*texture2D(waveTexture, uv)[tNow];
-  float term3 = (1.0/pow(dt,2.0))*(texture2D(waveTexture, uv)[tMinus1]);
+  float cSqared = pow(texture2D(speedTexture, uv).r,2.0);
+  float parts = partial(uv, waveTexture)[tNow];
+  vec2 waveHere = texture2D(waveTexture, uv).rg;
+  float currentWave = waveHere[tNow];
+  float prevWave = waveHere[tMinus1];
   
-
-  gl_FragColor[tPlus1] = (1.0/coeff1)*(pow(texture2D(speedTexture, uv).r,2.0)*laplace(uv, waveTexture)[tNow] + 
-                                    coeff2*texture2D(waveTexture, uv)[tNow] - 
-                                    (1.0/pow(dt,2.0))*texture2D(waveTexture, uv)[tMinus1]);
-  gl_FragColor[tPlus1] = texture2D(waveTexture,uv)[tNow]/20.0;
+  gl_FragColor[tPlus1] = (cSqared*dtSqared)*parts + 2.0*currentWave*(1.0 - (del*cSqared*dtSqared)) - prevWave;
 }
 `;
 
@@ -113,7 +113,7 @@ void main(){
   vec2 uv = gl_FragCoord.xy / resolution;
   //draw in the red channal
   float col = texture2D(waveTexture, uv)[pingpong];
-  gl_FragColor = vec4(col, 0.0,col,1.0);
+  gl_FragColor = vec4(col, 0.0,-col,1.0);
 }
 `;
 
@@ -124,7 +124,7 @@ uniform vec2 resolution;
 uniform sampler2D waveStart;
 void main(){
   vec2 uv = gl_FragCoord.xy / resolution;
-  gl_FragColor = vec4(0.0,texture2D(waveStart, uv).r,0.0,1.0);
+  gl_FragColor = vec4(0.0,0.05*texture2D(waveStart, uv).r,0.0,1.0);
 }
 `;
 
@@ -138,6 +138,5 @@ void main(){
   vec2 uv = gl_FragCoord.xy / resolution;
   vec4 vals = texture2D(waveTexture, uv);
   gl_FragColor = vec4(vals.g, vals.b, 0.0, vals.a);
-  gl_FragColor = vec4(0.0,10.0,0.0,vals.a);
   }
 `;

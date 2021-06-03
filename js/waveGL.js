@@ -29,7 +29,7 @@ const programCopy = twgl.createProgramInfo(gl, [waveVert, copyFrag]);
 
 //get the frame buffer so we can compute without drawing
 //magic line to get it to work
-const attachments = [{ internalFormat:gl.RGBA32F, minMag: gl.NEAREST, wrap: gl.CLAMP_TO_EDGE }];
+const attachments = [{ internalFormat:gl.RGBA32F, minMag: gl.LINEAR, wrap: gl.CLAMP_TO_EDGE }];
 let fb1 = twgl.createFramebufferInfo(gl,attachments);
 let fb2 = twgl.createFramebufferInfo(gl,attachments);
 
@@ -42,7 +42,7 @@ var ctx = c.getContext("2d");
 ctx.canvas.width = gl.canvas.width;
 ctx.canvas.height = gl.canvas.height;
 ctx.fillStyle = "#FF0000";
-ctx.fillRect(200, 200, 250, 250);
+ctx.fillRect(5, 5, 20, 20);
 
 const initTexture =  twgl.createTexture(gl, {src: ctx.canvas});
 
@@ -72,16 +72,20 @@ const speedTexture =  twgl.createTexture(gl, {src: ctx.canvas});
 let dt;
 let prevTime;
 let pingpong = 2;
-let b = 0.05
-let diff =[1/gl.canvas.width, 1/gl.canvas.height];
-
-
+let b = 0.01
+let diff =[10/gl.canvas.width, 10/gl.canvas.height];
+let vals;
+diff = [0.01,0.01];
 
 function draw(time){
+  vals = new Float32Array(gl.canvas.width*gl.canvas.height*4);
   twgl.resizeCanvasToDisplaySize(gl.canvas);
   gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
 
   dt = (prevTime) ? time - prevTime : 0;
+  dt = Math.max(0.005, dt);
+  dt = 0.001
+
   prevTime = time;
 
   function coeff(val){
@@ -96,13 +100,15 @@ function draw(time){
     speedTexture: speedTexture,
     diff: diff,
     dt: dt,
-    b: 0.05,
+    b: b,
     coeff1: coeff(1),
     coeff2: coeff(2),
     resolution: [gl.canvas.width, gl.canvas.height],
   });
   twgl.bindFramebufferInfo(gl, fb2);
   twgl.drawBufferInfo(gl, positionBuffer, gl.TRIANGLE_FAN);
+  //this reads the pixels to cpu so we can "look" at them
+  // gl.readPixels(0, 0, gl.canvas.width, gl.canvas.height, gl.RGBA, gl.FLOAT, vals);
 
   //now onto the render
   gl.useProgram(programVisualize.program);
@@ -126,11 +132,7 @@ function draw(time){
   twgl.bindFramebufferInfo(gl,fb1);
   twgl.drawBufferInfo(gl, positionBuffer, gl.TRIANGLE_FAN);
 
-  // //do da pingpong
-  // tempFrameBuffer = fb1;
-  // fb1 = fb2;
-  // fb2 = tempFrameBuffer;
-  // pingpong = (pingpong +1)%3;
+  // console.log(Math.max(vals));
 }
 
 
