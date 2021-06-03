@@ -92,7 +92,8 @@ void main(){
   float currentWave = waveHere[tNow];
   float prevWave = waveHere[tMinus1];
   
-  gl_FragColor[tPlus1] = (cSqared*dtSqared)*parts + 2.0*currentWave*(1.0 - (del*cSqared*dtSqared)) - prevWave;
+  // gl_FragColor[tPlus1] = (cSqared*dtSqared)*parts + 2.0*currentWave*(1.0 - (del*cSqared*dtSqared)) - prevWave;
+  gl_FragColor[tPlus1] = (1.0/coeff1)*(cSqared*(parts - 2.0*del*currentWave) + coeff2*currentWave - (prevWave/dtSqared));
 }
 `;
 
@@ -124,7 +125,7 @@ uniform vec2 resolution;
 uniform sampler2D waveStart;
 void main(){
   vec2 uv = gl_FragCoord.xy / resolution;
-  gl_FragColor = vec4(0.0,0.05*texture2D(waveStart, uv).r,0.0,1.0);
+  gl_FragColor = vec4(0.0,-0.05*texture2D(waveStart, uv).r,0.0,1.0);
 }
 `;
 

@@ -72,7 +72,7 @@ const speedTexture =  twgl.createTexture(gl, {src: ctx.canvas});
 let dt;
 let prevTime;
 let pingpong = 2;
-let b = 0.01
+let b = 2.0
 let diff =[10/gl.canvas.width, 10/gl.canvas.height];
 let vals;
 diff = [0.01,0.01];
