@@ -23,9 +23,9 @@ if (!gl) {
 
 //Creat the program object 
 const programInit = twgl.createProgramInfo(gl, [waveVert, initFrag]);
-const programCompute = twgl.createProgramInfo(gl, [waveVert, computeFrag]);
+const programCompute = twgl.createProgramInfo(gl, [waveVert, computeFrag2]);
 const programVisualize = twgl.createProgramInfo(gl, [waveVert, visualizeFrag]);
-const programCopy = twgl.createProgramInfo(gl, [waveVert, copyFrag]);
+const programCopy = twgl.createProgramInfo(gl, [waveVert, copyFrag2]);
 
 //get the frame buffer so we can compute without drawing
 //magic line to get it to work
@@ -41,9 +41,12 @@ const c = document.createElement("canvas")
 var ctx = c.getContext("2d");
 ctx.canvas.width = gl.canvas.width;
 ctx.canvas.height = gl.canvas.height;
+ctx.fillStyle = "#800000";
+ctx.fillRect(0, 0, gl.canvas.width, gl.canvas.height);
+ctx.fillStyle = "#000000";
+ctx.fillRect(200, 200, 40, 40);
 ctx.fillStyle = "#FF0000";
-ctx.fillRect(5, 5, 20, 20);
-
+ctx.fillRect(210, 210, 20, 20);
 const initTexture =  twgl.createTexture(gl, {src: ctx.canvas});
 
 //do the initilization
@@ -62,8 +65,10 @@ const d = document.createElement("canvas")
 var ctx = d.getContext("2d");
 ctx.canvas.width = gl.canvas.width;
 ctx.canvas.height = gl.canvas.height;
-ctx.fillStyle = "#FF0000";
+ctx.fillStyle = "#320000";
 ctx.fillRect(0, 0, gl.canvas.width, gl.canvas.height);
+ctx.fillStyle = "#FF0000";
+ctx.fillRect(0, 0, 100, 100);
 
 const speedTexture =  twgl.createTexture(gl, {src: ctx.canvas});
 
@@ -72,10 +77,10 @@ const speedTexture =  twgl.createTexture(gl, {src: ctx.canvas});
 let dt;
 let prevTime;
 let pingpong = 2;
-let b = 2.0
-let diff =[10/gl.canvas.width, 10/gl.canvas.height];
+let b = 0.999999
+let diff =[Math.pow(1/gl.canvas.width,2), Math.pow(1/gl.canvas.height,2)];
 let vals;
-diff = [0.01,0.01];
+// diff = [0.0005,0.0005];
 
 function draw(time){
   vals = new Float32Array(gl.canvas.width*gl.canvas.height*4);
@@ -83,8 +88,8 @@ function draw(time){
   gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
 
   dt = (prevTime) ? time - prevTime : 0;
-  dt = Math.max(0.005, dt);
-  dt = 0.001
+  dt = Math.min(0.0005, dt);
+  dt = 0.0005
 
   prevTime = time;
 
@@ -99,7 +104,7 @@ function draw(time){
     waveTexture: fb1.attachments[0],
     speedTexture: speedTexture,
     diff: diff,
-    dt: dt,
+    dtSqared: Math.pow(dt,2),
     b: b,
     coeff1: coeff(1),
     coeff2: coeff(2),

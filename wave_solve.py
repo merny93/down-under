@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 
 
 class WaveSolve:
-    def __init__(self, c, dt, dx, dy, b = 0.00):
+    def __init__(self, c, dt, dx, dy, b = 0.05):
         r = (np.max(c)*dt)/min(dx,dy)
         assert(r<= 1)
         self.dt = dt
@@ -32,7 +32,7 @@ class WaveSolve:
     def plot_place(self):
         plt.ion()
         plt.clf()
-        plt.imshow(self.grid[2,...], vmin=-1, vmax=1)
+        plt.imshow(self.grid[2,...], vmin=-1, vmax=0)
         plt.colorbar()
         plt.show()
         plt.pause(0.04)
@@ -51,11 +51,11 @@ f = np.zeros((L,L))
 z = np.hanning(8)
 c = np.ones((L,L))*2
 c[:,:L//3] = 20
-f[L//2-4: L//2+4,L//2-4: L//2+4] = 2
+f[L//2-4: L//2+4,L//2-4: L//2+4] = np.outer(z,z)
 # f[L//2,L//2] = 1
 # f[L//2] = 0.01
 g = np.zeros((L,L))
-w = WaveSolve(c,0.001,0.5,0.5)
+w = WaveSolve(c,0.01,0.5,0.5)
 w.create_grid(L,f,g)
 # w.step_soln()
 # w.plot_place()
