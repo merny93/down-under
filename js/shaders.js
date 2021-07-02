@@ -144,8 +144,8 @@ uniform sampler2D speedTexture;
 uniform vec2 resolution;
 
 //get the offsets
-vec2 dxV = vec2(1.0/resolution.x,0.0);
-vec2 dyV = vec2(0.0,1.0/resolution.y);
+highp vec2 dxV = vec2(1.0/resolution.x,0.0);
+highp vec2 dyV = vec2(0.0,1.0/resolution.y);
 
 //this is the damping coeff
 uniform float b;
@@ -167,7 +167,7 @@ void main(){
   vec2 uv = gl_FragCoord.xy / resolution;
 
   //sample the speed texture 
-  highp float medium = 1.0 + texture2D(speedTexture, uv).r;
+  highp float medium = 0.5 + 0.5*texture2D(speedTexture, uv).r;
 
   //get the equilibirum position to get force
   //this is just the average position of the neigbors
@@ -188,7 +188,7 @@ void main(){
 
   //now advect the velocity
   highp float newPos;
-  newPos = b*wavePosition + newVel;
+  newPos = wavePosition + newVel;
 
   //finally update the map
   gl_FragColor = vec4(1.0,1.0,1.0,1.0); //fill with defualt for good practice

@@ -114,7 +114,7 @@ const speedTexture =  makeSpeedTexture(gl);
 
 let dt;
 let prevTime;
-let b = 0.9999
+let b = 0.999;
 let vals;
 // diff = [0.0005,0.0005];
 
