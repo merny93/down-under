@@ -35,80 +35,43 @@ void main(){
 }
 `;
 
-const computeFrag = `
-//set precision
-precision highp float;
+const combinePage =  `
+precision mediump float;
 
-//channel 0,1,2 contain time "t-1" and "t" and "t+1" respectivly
+//take the existing revealed parts of the page
+// take the wave texture and reveal what it shows
+
 uniform sampler2D waveTexture;
-
-//assign read places
-const int tPlus1 = 2 ;
-const int tNow = 1;
-const int tMinus1 = 0;
-
-//speedmap
+uniform sampler2D visabilityTexture;
 uniform sampler2D speedTexture;
 
-//to get the uv coords
+const int posChannel = 1;
 uniform vec2 resolution;
 
-//this is dx,dy
-uniform vec2 diff;
-float dxSqared = diff.x;
-vec2 dxV = vec2(1.0/resolution.x,0.0);
-float dySquared = diff.y;
-vec2 dyV = vec2(0.0,1.0/resolution.y);
-float del = (1.0/dxSqared) + (1.0/dySquared);
-//dunno but we probs want dx to be give or take less than 1/numPixels
-
-//this is dt
-uniform float dtSqared;
-// float dtSqared = pow(dt, 2.0);
-
-//this is the damping coeff
-uniform float b;
-
-//this is (1/dt^2 +b/dt)
-uniform float coeff1;
-//this is (2/dt^2 +b/dt)
-uniform float coeff2;
-
-
-highp vec4 partial(vec2 pos, sampler2D wave){
-  vec4 res;
-  res = (texture2D(wave, pos+dxV) + texture2D(wave, pos -dxV))/dxSqared + 
-        (texture2D(wave, pos+dyV) + texture2D(wave, pos -dyV))/dySquared;
-  return res;
-}
-
 void main(){
-  //get the uv cords
   vec2 uv = gl_FragCoord.xy / resolution;
 
-  highp float cSqared = pow(1.5*texture2D(speedTexture, uv).r,2.0);
-  highp float parts = partial(uv, waveTexture)[tNow];
-  highp vec2 waveHere = texture2D(waveTexture, uv).rg;
-  highp float currentWave = waveHere[tNow];
-  highp float prevWave = waveHere[tMinus1];
-  
-  //first set the old
-  gl_FragColor = vec4(waveHere.rg, 0.0,1.0);
-
-  gl_FragColor[tPlus1] = (cSqared*dtSqared)*parts + 2.0*currentWave*(1.0 - (del*cSqared*dtSqared)) - prevWave;
-  // gl_FragColor[tPlus1] = (1.0/coeff1)*(cSqared*(parts - 2.0*del*currentWave) + coeff2*currentWave -(prevWave/dtSqared));
-
+  float currentVisibility = texture2D(visabilityTexture, uv).r;
+  float currentWave = texture2D(waveTexture, uv)[posChannel];
+  float maxVals = texture2D(speedTexture, uv).r;
+  gl_FragColor = vec4(min(maxVals, currentVisibility + 0.1*abs(currentWave)), 0.0,0.0,1.0);
 }
-`;
 
-const visualizeFrag = `
+`
+
+const visualize = `
 //This visualizes the wave:
 precision mediump float;
 //get the wave info
 uniform sampler2D waveTexture;
+
+//get the visability texture
+uniform sampler2D visabilityTexture;
+
+//get previous state
 //same info as above
 
-const int pingpong = 1;
+const int posChannel = 1;
 //read form the pingpong channel of waveTexture
 
 //to get the uv coords
@@ -117,13 +80,14 @@ uniform vec2 resolution;
 void main(){
   vec2 uv = gl_FragCoord.xy / resolution;
   //draw in the red channal
-  float col = texture2D(waveTexture, uv)[pingpong];
-  gl_FragColor = vec4(-col, 0.0,col,1.0);
+  float col = texture2D(waveTexture, uv)[posChannel];
+  float vis = texture2D(visabilityTexture, uv).r;
+  gl_FragColor = vec4(vis, 0.0 + vis,-5.0*col + vis,1.0);
 }
 `;
 
 
-const initFrag = `
+const initWave = `
 precision mediump float;
 uniform vec2 resolution;
 uniform sampler2D waveStart;
@@ -159,7 +123,7 @@ void main(){
   }
 `;
 
-const computeFrag2 = `
+const computePhysics = `
 //try two with the more classical approach
 
 //set precision
@@ -186,11 +150,15 @@ vec2 dyV = vec2(0.0,1.0/resolution.y);
 //this is the damping coeff
 uniform float b;
 
+vec2 safeSample(vec2 x){
+  vec2 res = 2.0 * abs(x/2.0 - floor(x/2.0 + 0.5));
+  return res;
+}
 
 highp float partial(vec2 pos, sampler2D wave){
-  vec4 res;
-  res = (texture2D(wave, pos+dxV) + texture2D(wave, pos -dxV) + 
-        texture2D(wave, pos+dyV) + texture2D(wave, pos -dyV));
+  highp vec4 res;
+  res = (texture2D(wave, safeSample(pos+dxV)) + texture2D(wave, safeSample(pos -dxV)) + 
+        texture2D(wave, safeSample(pos+dyV)) + texture2D(wave, safeSample(pos -dyV)));
   return res[pInd]*0.25;
 }
 
@@ -199,7 +167,7 @@ void main(){
   vec2 uv = gl_FragCoord.xy / resolution;
 
   //sample the speed texture 
-  highp float medium = 1.5*texture2D(speedTexture, uv).r;
+  highp float medium = 1.0 + texture2D(speedTexture, uv).r;
 
   //get the equilibirum position to get force
   //this is just the average position of the neigbors
@@ -220,7 +188,7 @@ void main(){
 
   //now advect the velocity
   highp float newPos;
-  newPos = wavePosition + newVel;
+  newPos = b*wavePosition + newVel;
 
   //finally update the map
   gl_FragColor = vec4(1.0,1.0,1.0,1.0); //fill with defualt for good practice
