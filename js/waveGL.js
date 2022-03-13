@@ -21,6 +21,7 @@ function getCanvas() {
 function makeContext(canvasID){
   var canvas = document.getElementById(canvasID);
   var gl = twgl.getContext(canvas, { depth: false, antialiasing: false });
+  console.log(gl)
   if (!gl) {
       alert("no web gl for me");
   }
@@ -41,17 +42,15 @@ function bindPrograms(gl, vertexProgram, fragList){
   return programs
 }
 
-programs = bindPrograms(gl,waveVert, {initWave:initWave, 
-                                    computePhysics:computePhysics, 
-                                    visualize:visualize,
-                                    combinePage: combinePage,});
+programs = bindPrograms(gl,waveVert, {fullFrag: fullFrag,
+                                    displayFrag: displayFrag});
 
 
 // makes various frame buffers
 // if use == "math" then will make a framebuffer which admits negative floats
 function makeFramebuffer(gl,use){
   if (use == "math"){
-    const attachments = [{ internalFormat:gl.RGBA32F, minMag: gl.LINEAR, wrap: gl.CLAMP_TO_EDGE }];
+    const attachments = [{ internalFormat:gl.RGBA32F, minMag: gl.NEAREST, wrap: gl.CLAMP_TO_EDGE }];
     return twgl.createFramebufferInfo(gl,attachments);
   } else {
     const attachments = [{ internalFormat:gl.RGBA, minMag: gl.LINEAR, wrap: gl.CLAMP_TO_EDGE }];
@@ -61,9 +60,6 @@ function makeFramebuffer(gl,use){
 let fb1 = makeFramebuffer(gl,"math");
 let fb2 = makeFramebuffer(gl, "math");
 
-//make frame buffer to store the state of pixels
-let fbVis1 = makeFramebuffer(gl, "not math");
-let fbVis2 = makeFramebuffer(gl, "not math");
 
 // this is for the vertex
 const positionObject = { position: { data: [1, 1, 1, -1, -1, -1, -1, 1], numComponents: 2 } };
@@ -75,26 +71,16 @@ function makeInitTexture(gl){
   var ctx = c.getContext("2d");
   ctx.canvas.width = gl.canvas.width;
   ctx.canvas.height = gl.canvas.height;
-  ctx.fillStyle = "#800000";
-  ctx.fillRect(0, 0, gl.canvas.width, gl.canvas.height);
   ctx.fillStyle = "#000000";
-  ctx.fillRect(200, 200, 40, 40);
+  ctx.fillRect(0, 0, gl.canvas.width, gl.canvas.height);
+  ctx.fillStyle = "#FFFF00";
+  ctx.fillRect(200, 200, 25, 25);
   // ctx.fillStyle = "#FF0000";
   // ctx.fillRect(210, 210, 20, 20);
-  return twgl.createTexture(gl, {src: ctx.canvas});
+  return twgl.createTexture(gl, {src: ctx.canvas, internalFormat: gl.RGBA32F});
 }
 const initTexture = makeInitTexture(gl);
 
-//do the initilization
-gl.useProgram(programs.initWave.program);
-twgl.setBuffersAndAttributes(gl, programs.initWave, positionBuffer);
-twgl.setUniforms(programs.initWave, {
-  resolution: [gl.canvas.width, gl.canvas.height],
-  waveStart: initTexture,
-})
-//bind a frame buffer to prevent the render
-twgl.bindFramebufferInfo(gl, fb1);
-twgl.drawBufferInfo(gl, positionBuffer, gl.TRIANGLE_FAN);
 
 /// make the speed map with just 1s
 function makeSpeedTexture(gl){
@@ -102,70 +88,72 @@ function makeSpeedTexture(gl){
   var ctx = d.getContext("2d");
   ctx.canvas.width = gl.canvas.width;
   ctx.canvas.height = gl.canvas.height;
-  ctx.fillStyle = "#000000";
-  ctx.fillRect(0, 0, gl.canvas.width, gl.canvas.height);
   ctx.fillStyle = "#FF0000";
+  ctx.fillRect(0, 0, gl.canvas.width, gl.canvas.height);
+  ctx.fillStyle = "#640000";
   ctx.fillRect(0, 0, 100, 100);
   return twgl.createTexture(gl, {src: ctx.canvas});
 }
-const speedTexture =  makeSpeedTexture(gl);
+const boundaryTexture =  makeSpeedTexture(gl);
 
 
 
 let dt;
 let prevTime;
-let b = 0.999;
-let vals;
-// diff = [0.0005,0.0005];
+let b = 0.9;
+let discoverSpeed = 1.0;
+let hideSpeed = 1.0;
+let c = 1.0;
+
+//need to do 1 by hand step to fill the frame buffer
+gl.useProgram(programs.fullFrag.program);
+twgl.setBuffersAndAttributes(gl,programs.fullFrag, positionBuffer);
+twgl.setUniforms(programs.fullFrag,{
+  memoryTexture: initTexture,
+  boundaryTexture: boundaryTexture,
+  b: 0.0,
+  dt:0.0,
+  c: c,
+  resolution: [gl.canvas.width, gl.canvas.height],
+  discoverSpeed: 0.0,
+  hideSpeed: 0.0,
+});
+twgl.bindFramebufferInfo(gl, fb2);
+twgl.drawBufferInfo(gl, positionBuffer, gl.TRIANGLE_FAN);
+
+
 
 function draw(time){
-  vals = new Float32Array(gl.canvas.width*gl.canvas.height*4);
   twgl.resizeCanvasToDisplaySize(gl.canvas);
   gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
 
   dt = (prevTime) ? time - prevTime : 0;
-  // console.log(dt);
-  dt = Math.min(0.0005, dt);
-  dt = 0.0005
-
   prevTime = time;
 
-  //do the physics
-  gl.useProgram(programs.computePhysics.program);
-  twgl.setBuffersAndAttributes(gl, programs.computePhysics, positionBuffer);
-  //now the million uniforms
-  twgl.setUniforms(programs.computePhysics,{
-    waveTexture: fb1.attachments[0],
-    speedTexture: speedTexture,
+  gl.useProgram(programs.fullFrag.program);
+  twgl.setBuffersAndAttributes(gl,programs.fullFrag, positionBuffer);
+  twgl.setUniforms(programs.fullFrag,{
+    memoryTexture: fb2.attachments[0],
+    boundaryTexture: boundaryTexture,
     b: b,
+    dt:dt,
+    c: c,
     resolution: [gl.canvas.width, gl.canvas.height],
+    discoverSpeed: discoverSpeed,
+    hideSpeed: hideSpeed,
   });
-  twgl.bindFramebufferInfo(gl, fb2);
+  twgl.bindFramebufferInfo(gl, fb1);
   twgl.drawBufferInfo(gl, positionBuffer, gl.TRIANGLE_FAN);
 
-
-  // did the wavesolve, now we need to visualize
-  gl.useProgram(programs.combinePage.program);
-  twgl.setBuffersAndAttributes(gl, programs.combinePage, positionBuffer);
-  twgl.setUniforms(programs.combinePage,{
-    waveTexture:fb2.attachments[0],
-    visabilityTexture: fbVis1.attachments[0],
-    speedTexture: speedTexture,
+  //now call renderer
+  gl.useProgram(programs.displayFrag.program);
+  twgl.setBuffersAndAttributes(gl, programs.displayFrag, positionBuffer);
+  twgl.setUniforms(programs.displayFrag,{
+    memoryTexture: fb1.attachments[0],
+    boundaryTexture: boundaryTexture,
     resolution: [gl.canvas.width, gl.canvas.height],
   });
-  twgl.bindFramebufferInfo(gl,fbVis2);
-  twgl.drawBufferInfo(gl, positionBuffer, gl.TRIANGLE_FAN);
 
-
-  //now onto the render
-  gl.useProgram(programs.visualize.program);
-  twgl.setBuffersAndAttributes(gl, programs.visualize, positionBuffer);
-  //pass the framebuffer uniform
-  twgl.setUniforms(programs.visualize,{
-    resolution: [gl.canvas.width, gl.canvas.height],
-    waveTexture: fb2.attachments[0],
-    visabilityTexture: fbVis2.attachments[0],
-  });
   //let it draw to the screen
   twgl.bindFramebufferInfo(gl,null);
   twgl.drawBufferInfo(gl, positionBuffer, gl.TRIANGLE_FAN);
@@ -174,10 +162,6 @@ function draw(time){
   temp = fb1;
   fb1 = fb2;
   fb2 = temp;
-
-  temp = fbVis1;
-  fbVis1 = fbVis2;
-  fbVis2 = temp;
 
 }
 

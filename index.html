@@ -19,19 +19,24 @@
 
 <body>
 	
-	<script src="bundle.js"></script>
+	<script src="bundle.js"></script> <!-- Load in the bundle of stuff-->
 	<div id="web-template" style="width: 640px !important; height: 480px !important;">
-		<div style="font-size: large;">
+		<div style="font-size: large; text-align: center;">
+			<br>
+			<br>
+			<br>
 			BONJOUR I am simon <br>
 			This is my swamp
 		</div>
 	</div>
 	<button style="margin-top: 100px;" onclick="getCanvas();">press me</button>
-	<canvas id="glCanvas" width="640" height="480"></canvas>
+	<div style="position: absolute; top: 0;">
+		<canvas id="glCanvas" width="640" height="480"></canvas>
+	</div>
 	<!-- <script src="js/image.js"></script> -->
 	
 	<script src="js/shaders.js"></script>
 	<script src="js/waveGL.js"></script>
 </body>
-
+<!-- https://www.shadertoy.com/view/4lXXDB for later -->
 </html>
