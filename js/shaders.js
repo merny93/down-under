@@ -33,7 +33,7 @@ const int hardBoundaryInd = 1; //hard bc index
 const int dampingInd = 2; // damping index
 
 //to get the uv coords
-uniform vec2 resolution;
+uniform ivec2 resolution;
 
 //get the offsets
 ivec2 dxV = ivec2(1,0);
@@ -46,10 +46,14 @@ uniform float c;
 
 // set time step
 uniform float dt;
+uniform float dx;
 
 //set visibility settings 
 uniform float discoverSpeed;
 uniform float hideSpeed;
+
+uniform ivec2 mousePos;
+uniform bool pulse;
 
 
 
@@ -62,9 +66,13 @@ float laplace(ivec2 pos, sampler2D wave){
   return res;
 }
 
+float gaussian(float r){
+  return exp(-r*r / 25.0);
+}
+
 void main(){
   //get the uv cords
-  vec2 uv = gl_FragCoord.xy / resolution;
+  vec2 uv = gl_FragCoord.xy / vec2(resolution);
   ivec2 pixelPosition = ivec2(gl_FragCoord.xy);
 
   //sample the wave velovity and position now
@@ -78,37 +86,47 @@ void main(){
   float currentVisibility = fullInfoHere[discoveredInd];
   float mediumVelocity = c*boundaryInfoHere[velocityInd]; ///multiply by max speed
   float boundaryCondition = boundaryInfoHere[hardBoundaryInd]; // 1 if bc 0 otherwise
-  float dampingCoef = max(1.0 - boundaryInfoHere[dampingInd] - b,0.0) ; //0 for no damping 1 for max damping
-  dampingCoef = b;
+
   
   //for now 
-  float b = 0.0;
-  float dt = 4e-3;
-  float dx = 2.0/450.0;
+  // float dt = 4e-3;
+  // float dt = 0.0167;
+  // float dx = 2.0/50.0;
   
+  if (pulse){
+    float r = distance(vec2(mousePos), vec2(pixelPosition));
+    wavePosition += gaussian(r);
+  }
+
   //integrate the new velocity
   float newVel;
   newVel = waveVelocity + (dt/(2.0*dx*dx) * laplace(pixelPosition, memoryTexture));
 
-  //apply the damping as
+
+
+  //Compute a absorbing layer which scales linearly with distance to the boundary
+  int boundaryDist = min(min(pixelPosition.x, pixelPosition.y), min(resolution.x - pixelPosition.x, resolution.y -pixelPosition.y));
+  float boundaryb = max(b, 50.0 - (2.0 * float(boundaryDist)) );
+
+  //compute the force
   float avgForce;
-  avgForce =  - 0.5*(waveVelocity + newVel)*b;
+  avgForce =  -newVel*boundaryb;
   // integrate force
-  // newVel = newVel + (avgForce *dt);
+  newVel = newVel + (avgForce *dt);
 
 
   //now advect the position
   float newPos;
-  newPos = wavePosition + newVel*dt; //*mediumVelocity;
+  newPos = wavePosition + newVel*dt * mediumVelocity;
 
-  // if (boundaryCondition > 0.5){
-  //   newPos = 0.0;
-  // }
+  if (boundaryCondition > 0.5){
+    newPos = 0.0;
+  }
   //now for visibility
   //starts at zero and add as it goes 
 
   float newVisibility;
-  newVisibility = currentVisibility + discoverSpeed*abs(newPos) - dt*hideSpeed;
+  newVisibility = min(currentVisibility + discoverSpeed*abs(newPos) - dt*hideSpeed,2.0);
 
   // gl_FragColor = vec4(1.0,1.0,1.0,1.0); //fill with defualt for good practice
   fragColor[positionInd] = newPos;
@@ -152,10 +170,11 @@ void main(){
   float waveVelocity = waveInfo[velocityInd];
   float currentVisibility = waveInfo[discoveredInd];
   float boundaryCondition = boundaryInfo[hardBoundaryInd]; // 1 if bc 0 otherwise
+  float mediumVelocity = boundaryInfo[velocityInd];
 
   //goes to zero if a boundary is there or if current visibility goes to 1
   float visibility = max(0.0, 1.0 - boundaryCondition - currentVisibility);
-  float wave = 0.5 + wavePosition;
-  fragColor = vec4(0, -wavePosition, wavePosition,1.0);
+  float wave = 0.2 + 3.0* wavePosition;
+  fragColor = vec4(0.1, 0.1, wave,max(visibility,mediumVelocity - 0.3));
 }
 `

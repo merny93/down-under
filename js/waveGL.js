@@ -1,20 +1,33 @@
 const twgl = require("twgl.js");
 const html2canvas = require("html2canvas");
 
+let mouseX = 0;
+let mouseY = 0;
 
-// the slow part is getting the canvas...
-// will upgrade later to default to a map of 1s and then update to the actual vals when we have them
-function getCanvas() {
-  html2canvas(document.getElementById("web-template")).then(function (canvas) {
-    let ctx = canvas.getContext("2d");
-    // ctx.fillStyle = "#FF0000";
-    // ctx.fillRect(120, 120, 1000, 1000);
-    ctx.width = 640;
-    ctx.height = 480;
-    document.body.appendChild(ctx.canvas);
-    make_render(ctx.canvas);
-  });
+function getRelativeMousePosition(event, target) {
+  target = target || event.target;
+  var rect = target.getBoundingClientRect();
+
+  return {
+    x: event.clientX - rect.left,
+    y: event.clientY - rect.top,
+  }
 }
+
+// assumes target or event.target is canvas
+function getNoPaddingNoBorderCanvasRelativeMousePosition(event, target) {
+  target = target || event.target;
+  var pos = getRelativeMousePosition(event, target);
+
+  pos.x = pos.x * target.width  / target.clientWidth;
+  pos.y = pos.y * target.height / target.clientHeight;
+
+  return pos;  
+}
+
+
+
+
 
 
 // generate the webGL environment
@@ -29,6 +42,13 @@ function makeContext(canvasID){
 }
 
 var gl = makeContext("glCanvas");
+
+window.addEventListener('mousemove', e => {
+  const pos = getNoPaddingNoBorderCanvasRelativeMousePosition(e, gl.canvas);
+  // pos is in pixel coordinates for the canvas.
+  mouseX = pos.x;
+  mouseY = gl.canvas.height - pos.y;
+})
 
 // generate an object of porgrams with all the same vertex shader. 
 // fragList is a object with keys for names of programs and values of the fragSahders
@@ -71,10 +91,10 @@ function makeInitTexture(gl){
   var ctx = c.getContext("2d");
   ctx.canvas.width = gl.canvas.width;
   ctx.canvas.height = gl.canvas.height;
-  ctx.fillStyle = "#000000";
+  ctx.fillStyle = "rgb(0,0,0)";
   ctx.fillRect(0, 0, gl.canvas.width, gl.canvas.height);
-  ctx.fillStyle = "#FFFF00";
-  ctx.fillRect(200, 200, 25, 25);
+  // ctx.fillStyle = "rgb(255,255,0)";
+  // ctx.fillRect(200, 200, 25, 25);
   // ctx.fillStyle = "#FF0000";
   // ctx.fillRect(210, 210, 20, 20);
   return twgl.createTexture(gl, {src: ctx.canvas, internalFormat: gl.RGBA32F});
@@ -88,23 +108,23 @@ function makeSpeedTexture(gl){
   var ctx = d.getContext("2d");
   ctx.canvas.width = gl.canvas.width;
   ctx.canvas.height = gl.canvas.height;
-  ctx.fillStyle = "#FF0000";
+  ctx.fillStyle = "rgb(100,0,0)";
   ctx.fillRect(0, 0, gl.canvas.width, gl.canvas.height);
-  ctx.fillStyle = "#640000";
-  ctx.fillRect(0, 0, 100, 100);
+  ctx.fillStyle = "rgb(255,0,0)";
+  ctx.fillRect(0, 0, 150, 150);
   return twgl.createTexture(gl, {src: ctx.canvas});
 }
-const boundaryTexture =  makeSpeedTexture(gl);
+let boundaryTexture =  makeSpeedTexture(gl);
 
 
 
 let dt;
 let prevTime;
-let b = 0.9;
-let discoverSpeed = 1.0;
-let hideSpeed = 1.0;
+let b = 0.5;
+let discoverSpeed = 10.2;
+let hideSpeed = 0.25;
 let c = 1.0;
-
+let wavePeriod = 2.0;
 //need to do 1 by hand step to fill the frame buffer
 gl.useProgram(programs.fullFrag.program);
 twgl.setBuffersAndAttributes(gl,programs.fullFrag, positionBuffer);
@@ -112,24 +132,32 @@ twgl.setUniforms(programs.fullFrag,{
   memoryTexture: initTexture,
   boundaryTexture: boundaryTexture,
   b: 0.0,
-  dt:0.0,
+  dt:1.0,
+  dx:1.0,
   c: c,
   resolution: [gl.canvas.width, gl.canvas.height],
   discoverSpeed: 0.0,
   hideSpeed: 0.0,
+  mousePos: [0,0],
+  pulse: false,
 });
 twgl.bindFramebufferInfo(gl, fb2);
 twgl.drawBufferInfo(gl, positionBuffer, gl.TRIANGLE_FAN);
 
-
-
+let lastPulse = 0.0;
 function draw(time){
   twgl.resizeCanvasToDisplaySize(gl.canvas);
   gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
 
-  dt = (prevTime) ? time - prevTime : 0;
+  dt = (prevTime) ? time - prevTime : 0.0001;
   prevTime = time;
-
+  if (lastPulse > wavePeriod){
+    pulse = true
+    lastPulse = 0.0
+  } else {
+    pulse = false
+    lastPulse += dt
+  }
   gl.useProgram(programs.fullFrag.program);
   twgl.setBuffersAndAttributes(gl,programs.fullFrag, positionBuffer);
   twgl.setUniforms(programs.fullFrag,{
@@ -137,10 +165,13 @@ function draw(time){
     boundaryTexture: boundaryTexture,
     b: b,
     dt:dt,
+    dx: dt/0.75, //CFL condition
     c: c,
     resolution: [gl.canvas.width, gl.canvas.height],
     discoverSpeed: discoverSpeed,
     hideSpeed: hideSpeed,
+    mousePos: [mouseX,mouseY],
+    pulse: pulse,
   });
   twgl.bindFramebufferInfo(gl, fb1);
   twgl.drawBufferInfo(gl, positionBuffer, gl.TRIANGLE_FAN);
@@ -174,38 +205,51 @@ function draw(time){
 
 
 
+// the slow part is getting the canvas...
+// will upgrade later to default to a map of 1s and then update to the actual vals when we have them
+async function getCanvas() {
+  let ctx = await html2canvas(document.getElementById("web-template")).then(function (canvas) {
+    let ctx = canvas.getContext("2d");
+    // ctx.fillStyle = "#FF0000";
+    // ctx.fillRect(120, 120, 1000, 1000);
+    ctx.width = gl.canvas.width;
+    ctx.height = gl.canvas.height;
+    // document.body.appendChild(ctx.canvas);
+    return ctx
+    
+    
 
+  });
+  console.log(ctx)
+  
+  let tempCanvas = document.createElement("canvas"),
+    tempCtx = tempCanvas.getContext("2d");
+  tempCanvas.width =  ctx.canvas.width;
+  tempCanvas.height = ctx.canvas.height;
+  tempCtx.drawImage(ctx.canvas,0,0, ctx.canvas.width, ctx.canvas.height);
 
+  ctx.fillStyle = "#000";
+  ctx.fillRect(0,0,ctx.canvas.width, ctx.canvas.height);
 
-//create the render 
-// called when the canvas image is ready!
-//test code from earlier
-function make_render(canvas){
-  const programInfo = twgl.createProgramInfo(gl, [vertexShader, fragSahder]);
+  // ctx.save();
+  ctx.scale(1,-1);
+  ctx.translate(0,-ctx.canvas.height);
+  ctx.drawImage(tempCanvas,0,0, ctx.canvas.width, ctx.canvas.height);
+  // ctx.restore();
 
-  const textures =  twgl.createTexture(gl, {src: canvas, min: gl.LINEAR, mag:gl.NEAREST,});
+  let imgData = ctx.getImageData(0,0,ctx.canvas.width, ctx.canvas.height);
+  console.log(imgData)
+  let pixels = imgData.data;
+  for (var i = 0; i < pixels.length; i += 4) {
 
-  const arrays = {
-    position: [-1, -1, 0, 1, -1, 0, -1, 1, 0, -1, 1, 0, 1, -1, 0, 1, 1, 0],
-  };
-  const bufferInfo =  twgl.createBufferInfoFromArrays(gl, arrays);
+    let lightness = parseInt((pixels[i] + pixels[i + 1] + pixels[i + 2]) / 3);
 
-  function render(time) {
-    twgl.resizeCanvasToDisplaySize(gl.canvas);
-    gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
-
-    const uniforms = {
-      resolution: [gl.canvas.width, gl.canvas.height],
-      u_texture: textures,
-    };
-
-    gl.useProgram(programInfo.program);
-    twgl.setBuffersAndAttributes(gl, programInfo, bufferInfo);
-    twgl.setUniforms(programInfo, uniforms);
-    twgl.drawBufferInfo(gl, bufferInfo);
-
-    requestAnimationFrame(render);
+    pixels[i] = Math.max(lightness, 150);
+    pixels[i + 1] = 0;
+    pixels[i + 2] = 0;
   }
-  console.log("hey")
-  requestAnimationFrame(render);
+  ctx.putImageData(imgData, 0, 0);
+  // document.body.appendChild(ctx.canvas);
+  boundaryTexture =  twgl.createTexture(gl, {src: ctx.canvas})
+  
 }
